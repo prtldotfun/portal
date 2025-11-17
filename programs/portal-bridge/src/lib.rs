@@ -17,4 +17,8 @@ pub mod portal_bridge {
     pub fn initialize(ctx: Context<Initialize>, params: InitializeParams) -> Result<()> {
         instructions::initialize::handler(ctx, params)
     }
+
+    pub fn register_chain(ctx: Context<RegisterChain>, params: RegisterChainParams) -> Result<()> {
+        instructions::register_chain::handler(ctx, params)
+    }
 }
