@@ -1,13 +1,23 @@
+pub mod cancel_intent;
 pub mod create_wrapper;
 pub mod initialize;
+pub mod register_agent;
 pub mod register_chain;
+pub mod settle_intent;
 pub mod submit_intent;
 pub mod unwrap;
+pub mod update_agent;
+pub mod update_config;
 pub mod wrap;
 
+pub use cancel_intent::*;
 pub use create_wrapper::*;
 pub use initialize::*;
+pub use register_agent::*;
 pub use register_chain::*;
+pub use settle_intent::*;
 pub use submit_intent::*;
 pub use unwrap::*;
+pub use update_agent::*;
+pub use update_config::*;
 pub use wrap::*;
