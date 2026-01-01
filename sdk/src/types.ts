@@ -88,3 +88,105 @@ export interface AgentProfile {
     owner: PublicKey;
     alias: string;
     status: AgentStatus;
+    totalWraps: BN;
+    totalUnwraps: BN;
+    totalIntents: BN;
+    totalVolume: BN;
+    registeredAt: BN;
+    lastActivity: BN;
+    bump: number;
+}
+
+export interface SupportedChain {
+    chainId: number;
+    name: string;
+    nativeCurrency: string;
+    explorerUrl: string;
+    rpcUrl: string;
+    bridgeContract: string;
+}
+
+export interface WrapResult {
+    signature: string;
+    wrapperMint: PublicKey;
+    amount: BN;
+    adjustedAmount: BN;
+    agent: PublicKey;
+}
+
+export interface UnwrapResult {
+    signature: string;
+    wrapperMint: PublicKey;
+    amount: BN;
+    feeAmount: BN;
+    destinationChainId: number;
+    destinationAddress: Uint8Array;
+}
+
+export interface IntentResult {
+    signature: string;
+    intentId: BN;
+    wrapperMint: PublicKey;
+    amount: BN;
+    netAmount: BN;
+    feeAmount: BN;
+    destinationChainId: number;
+    destinationAddress: Uint8Array;
+    expirySlot: BN;
+}
+
+export interface SettlementResult {
+    signature: string;
+    intentId: BN;
+    settlementTxHash: Uint8Array;
+    relayer: PublicKey;
+}
+
+export interface CreateWrapperConfig {
+    sourceChainId: number;
+    sourceTokenAddress: Uint8Array;
+    symbol: string;
+    name: string;
+    decimals: number;
+    sourceDecimals: number;
+    metadataUri: string;
+}
+
+export interface RegisterChainConfig {
+    chainId: number;
+    name: string;
+    confirmationsRequired: number;
+    bridgeContract: Uint8Array;
+}
+
+export interface InitializeConfig {
+    feeBps: number;
+    treasury: PublicKey;
+    relayer: PublicKey;
+}
+
+export interface WrapConfig {
+    wrapperMint: PublicKey;
+    agentOwner: PublicKey;
+    amount: BN;
+    sourceTxHash: Uint8Array;
+}
+
+export interface UnwrapConfig {
+    wrapperMint: PublicKey;
+    amount: BN;
+    destinationChainId: number;
+    destinationAddress: Uint8Array;
+}
+
+export interface SubmitIntentConfig {
+    wrapperMint: PublicKey;
+    amount: BN;
+    destinationChainId: number;
+    destinationAddress: Uint8Array;
+}
+
+export interface SettleIntentConfig {
+    intentId: BN;
+    settlementTxHash: Uint8Array;
+}
