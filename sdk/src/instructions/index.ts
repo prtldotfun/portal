@@ -198,3 +198,169 @@ export class PortalInstructions {
         ]);
 
         return new TransactionInstruction({
+            keys: [
+                { pubkey: relayer, isSigner: true, isWritable: true },
+                { pubkey: bridgeConfig, isSigner: false, isWritable: true },
+                { pubkey: chainRegistry, isSigner: false, isWritable: false },
+                { pubkey: config.wrapperMint, isSigner: false, isWritable: true },
+                { pubkey: wrapperMeta, isSigner: false, isWritable: true },
+                { pubkey: agentProfile, isSigner: false, isWritable: true },
+                { pubkey: agentOwner, isSigner: false, isWritable: false },
+                { pubkey: PublicKey.default, isSigner: false, isWritable: true },
+                { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+            ],
+            programId: this.programId,
+            data,
+        });
+    }
+
+    unwrapTokens(
+        agent: PublicKey,
+        config: UnwrapConfig
+    ): TransactionInstruction {
+        const [bridgeConfig] = deriveBridgeConfigPda(this.programId);
+        const [chainRegistry] = deriveChainRegistryPda(this.programId);
+        const [wrapperMeta] = deriveWrapperMetaPda(
+            config.wrapperMint,
+            this.programId
+        );
+        const [agentProfile] = deriveAgentPda(agent, this.programId);
+
+        const data = Buffer.concat([
+            encodeInstructionDiscriminator("unwrap_tokens"),
+            serializeUnwrapParams({
+                amount: config.amount,
+                destinationChainId: config.destinationChainId,
+                destinationAddress: config.destinationAddress,
+            }),
+        ]);
+
+        return new TransactionInstruction({
+            keys: [
+                { pubkey: agent, isSigner: true, isWritable: true },
+                { pubkey: bridgeConfig, isSigner: false, isWritable: true },
+                { pubkey: chainRegistry, isSigner: false, isWritable: false },
+                { pubkey: config.wrapperMint, isSigner: false, isWritable: true },
+                { pubkey: wrapperMeta, isSigner: false, isWritable: true },
+                { pubkey: agentProfile, isSigner: false, isWritable: true },
+                { pubkey: PublicKey.default, isSigner: false, isWritable: true },
+                { pubkey: PublicKey.default, isSigner: false, isWritable: false },
+                { pubkey: PublicKey.default, isSigner: false, isWritable: true },
+                { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+            ],
+            programId: this.programId,
+            data,
+        });
+    }
+
+    submitIntent(
+        agent: PublicKey,
+        config: SubmitIntentConfig,
+        intentId: BN
+    ): TransactionInstruction {
+        const [bridgeConfig] = deriveBridgeConfigPda(this.programId);
+        const [chainRegistry] = deriveChainRegistryPda(this.programId);
+        const [wrapperMeta] = deriveWrapperMetaPda(
+            config.wrapperMint,
+            this.programId
+        );
+        const [agentProfile] = deriveAgentPda(agent, this.programId);
+        const [intentRecord] = deriveIntentPda(intentId, this.programId);
+
+        const data = Buffer.concat([
+            encodeInstructionDiscriminator("submit_intent"),
+            serializeSubmitIntentParams({
+                amount: config.amount,
+                destinationChainId: config.destinationChainId,
+                destinationAddress: config.destinationAddress,
+            }),
+        ]);
+
+        return new TransactionInstruction({
+            keys: [
+                { pubkey: agent, isSigner: true, isWritable: true },
+                { pubkey: bridgeConfig, isSigner: false, isWritable: true },
+                { pubkey: chainRegistry, isSigner: false, isWritable: false },
+                { pubkey: config.wrapperMint, isSigner: false, isWritable: true },
+                { pubkey: wrapperMeta, isSigner: false, isWritable: true },
+                { pubkey: agentProfile, isSigner: false, isWritable: true },
+                { pubkey: intentRecord, isSigner: false, isWritable: true },
+                { pubkey: PublicKey.default, isSigner: false, isWritable: true },
+                { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+                { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+            ],
+            programId: this.programId,
+            data,
+        });
+    }
+
+    settleIntent(
+        relayer: PublicKey,
+        config: SettleIntentConfig
+    ): TransactionInstruction {
+        const [bridgeConfig] = deriveBridgeConfigPda(this.programId);
+        const [intentRecord] = deriveIntentPda(config.intentId, this.programId);
+
+        const data = Buffer.concat([
+            encodeInstructionDiscriminator("settle_intent"),
+            serializeSettleIntentParams({
+                settlementTxHash: config.settlementTxHash,
+            }),
+        ]);
+
+        return new TransactionInstruction({
+            keys: [
+                { pubkey: relayer, isSigner: true, isWritable: true },
+                { pubkey: bridgeConfig, isSigner: false, isWritable: true },
+                { pubkey: intentRecord, isSigner: false, isWritable: true },
+            ],
+            programId: this.programId,
+            data,
+        });
+    }
+
+    registerAgent(
+        owner: PublicKey,
+        alias: string
+    ): TransactionInstruction {
+        const [bridgeConfig] = deriveBridgeConfigPda(this.programId);
+        const [agentProfile] = deriveAgentPda(owner, this.programId);
+
+        const data = Buffer.concat([
+            encodeInstructionDiscriminator("register_agent"),
+            serializeRegisterAgentParams({ alias }),
+        ]);
+
+        return new TransactionInstruction({
+            keys: [
+                { pubkey: owner, isSigner: true, isWritable: true },
+                { pubkey: bridgeConfig, isSigner: false, isWritable: true },
+                { pubkey: agentProfile, isSigner: false, isWritable: true },
+                { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+            ],
+            programId: this.programId,
+            data,
+        });
+    }
+
+    updateAgent(
+        owner: PublicKey,
+        alias: string
+    ): TransactionInstruction {
+        const [agentProfile] = deriveAgentPda(owner, this.programId);
+
+        const data = Buffer.concat([
+            encodeInstructionDiscriminator("update_agent"),
+            serializeRegisterAgentParams({ alias }),
+        ]);
+
+        return new TransactionInstruction({
+            keys: [
+                { pubkey: owner, isSigner: true, isWritable: true },
+                { pubkey: agentProfile, isSigner: false, isWritable: true },
+            ],
+            programId: this.programId,
+            data,
+        });
+    }
+}
