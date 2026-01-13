@@ -118,3 +118,83 @@ export class PortalClient {
             alias: "",
             status: "active",
             totalWraps: new BN(0),
+            totalUnwraps: new BN(0),
+            totalIntents: new BN(0),
+            totalVolume: new BN(0),
+            registeredAt: new BN(0),
+            lastActivity: new BN(0),
+            bump: 0,
+        };
+    }
+
+    async getIntentRecord(intentId: BN): Promise<IntentRecord | null> {
+        const [pda] = deriveIntentPda(intentId, this.programId);
+        const accountInfo = await this.connection.getAccountInfo(pda);
+        if (!accountInfo) return null;
+
+        return {
+            intentId,
+            agent: PublicKey.default,
+            sourceChainId: 0,
+            destinationChainId: 0,
+            wrapperMint: PublicKey.default,
+            amount: new BN(0),
+            feeAmount: new BN(0),
+            netAmount: new BN(0),
+            destinationAddress: new Uint8Array(32),
+            status: "pending",
+            createdAt: new BN(0),
+            settledAt: new BN(0),
+            settlementTxHash: new Uint8Array(32),
+            relayer: PublicKey.default,
+            expirySlot: new BN(0),
+            bump: 0,
+        };
+    }
+
+    async initialize(
+        authority: Keypair,
+        config: InitializeConfig
+    ): Promise<string> {
+        const ix = this.instructions.initialize(authority.publicKey, config);
+        const tx = new Transaction().add(ix);
+        return sendAndConfirmTransaction(this.connection, tx, [authority]);
+    }
+
+    async registerChain(
+        authority: Keypair,
+        config: RegisterChainConfig
+    ): Promise<string> {
+        const ix = this.instructions.registerChain(authority.publicKey, config);
+        const tx = new Transaction().add(ix);
+        return sendAndConfirmTransaction(this.connection, tx, [authority]);
+    }
+
+    async createWrapper(
+        authority: Keypair,
+        config: CreateWrapperConfig
+    ): Promise<PublicKey> {
+        const ix = this.instructions.createWrapper(authority.publicKey, config);
+        const tx = new Transaction().add(ix);
+        await sendAndConfirmTransaction(this.connection, tx, [authority]);
+
+        const [wrapperMint] = deriveWrapperMintPda(
+            config.sourceChainId,
+            config.sourceTokenAddress,
+            this.programId
+        );
+        return wrapperMint;
+    }
+
+    async wrapTokens(relayer: Keypair, config: WrapConfig): Promise<WrapResult> {
+        const agentAta = await getAssociatedTokenAddress(
+            config.wrapperMint,
+            config.agentOwner
+        );
+
+        const ataInfo = await this.connection.getAccountInfo(agentAta);
+        const tx = new Transaction();
+
+        if (!ataInfo) {
+            tx.add(
+                createAssociatedTokenAccountInstruction(
