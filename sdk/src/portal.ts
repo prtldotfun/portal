@@ -198,3 +198,142 @@ export class PortalClient {
         if (!ataInfo) {
             tx.add(
                 createAssociatedTokenAccountInstruction(
+                    relayer.publicKey,
+                    agentAta,
+                    config.agentOwner,
+                    config.wrapperMint
+                )
+            );
+        }
+
+        const ix = this.instructions.wrapTokens(
+            relayer.publicKey,
+            config.agentOwner,
+            config
+        );
+        tx.add(ix);
+
+        const signature = await sendAndConfirmTransaction(this.connection, tx, [
+            relayer,
+        ]);
+
+        return {
+            signature,
+            wrapperMint: config.wrapperMint,
+            amount: config.amount,
+            adjustedAmount: config.amount,
+            agent: config.agentOwner,
+        };
+    }
+
+    async unwrapTokens(
+        agent: Keypair,
+        config: UnwrapConfig
+    ): Promise<UnwrapResult> {
+        const ix = this.instructions.unwrapTokens(agent.publicKey, config);
+        const tx = new Transaction().add(ix);
+
+        const signature = await sendAndConfirmTransaction(this.connection, tx, [
+            agent,
+        ]);
+
+        return {
+            signature,
+            wrapperMint: config.wrapperMint,
+            amount: config.amount,
+            feeAmount: new BN(0),
+            destinationChainId: config.destinationChainId,
+            destinationAddress: config.destinationAddress,
+        };
+    }
+
+    async submitIntent(
+        agent: Keypair,
+        config: SubmitIntentConfig
+    ): Promise<IntentResult> {
+        const bridgeConfig = await this.getBridgeConfig();
+        const intentId = bridgeConfig?.totalIntents ?? new BN(0);
+
+        const ix = this.instructions.submitIntent(
+            agent.publicKey,
+            config,
+            intentId
+        );
+        const tx = new Transaction().add(ix);
+
+        const signature = await sendAndConfirmTransaction(this.connection, tx, [
+            agent,
+        ]);
+
+        return {
+            signature,
+            intentId,
+            wrapperMint: config.wrapperMint,
+            amount: config.amount,
+            netAmount: config.amount,
+            feeAmount: new BN(0),
+            destinationChainId: config.destinationChainId,
+            destinationAddress: config.destinationAddress,
+            expirySlot: new BN(0),
+        };
+    }
+
+    async settleIntent(
+        relayer: Keypair,
+        config: SettleIntentConfig
+    ): Promise<SettlementResult> {
+        const ix = this.instructions.settleIntent(relayer.publicKey, config);
+        const tx = new Transaction().add(ix);
+
+        const signature = await sendAndConfirmTransaction(this.connection, tx, [
+            relayer,
+        ]);
+
+        return {
+            signature,
+            intentId: config.intentId,
+            settlementTxHash: config.settlementTxHash,
+            relayer: relayer.publicKey,
+        };
+    }
+
+    async registerAgent(agent: Keypair, alias: string): Promise<string> {
+        const ix = this.instructions.registerAgent(agent.publicKey, alias);
+        const tx = new Transaction().add(ix);
+        return sendAndConfirmTransaction(this.connection, tx, [agent]);
+    }
+
+    async updateAgent(agent: Keypair, alias: string): Promise<string> {
+        const ix = this.instructions.updateAgent(agent.publicKey, alias);
+        const tx = new Transaction().add(ix);
+        return sendAndConfirmTransaction(this.connection, tx, [agent]);
+    }
+
+    async getAgentTokenBalance(
+        agentOwner: PublicKey,
+        wrapperMint: PublicKey
+    ): Promise<BN> {
+        const ata = await getAssociatedTokenAddress(wrapperMint, agentOwner);
+        const accountInfo = await this.connection.getAccountInfo(ata);
+        if (!accountInfo) return new BN(0);
+
+        const balance = await this.connection.getTokenAccountBalance(ata);
+        return new BN(balance.value.amount);
+    }
+
+    async getActiveIntents(agent: PublicKey): Promise<IntentRecord[]> {
+        const intents: IntentRecord[] = [];
+        const config = await this.getBridgeConfig();
+        if (!config) return intents;
+
+        const totalIntents = config.totalIntents.toNumber();
+        for (let i = 0; i < totalIntents; i++) {
+            const intent = await this.getIntentRecord(new BN(i));
+            if (intent && intent.agent.equals(agent) && intent.status === "pending") {
+                intents.push(intent);
+            }
+        }
+
+        return intents;
+    }
+}
