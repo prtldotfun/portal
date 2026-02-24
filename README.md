@@ -58,3 +58,73 @@ graph TB
         BC[Bridge Config]
         CR[Chain Registry]
         WM[Wrapper Mints]
+        IR[Intent Records]
+        AP[Agent Profiles]
+    end
+
+    subgraph "Agent Operations"
+        WRAP[Wrap: Mint pTokens]
+        UNWRAP[Unwrap: Burn + Settle]
+        INTENT[Submit Intent]
+        TRADE[Trade pTokens]
+    end
+
+    ETH --> WRAP
+    BASE --> WRAP
+    ARB --> WRAP
+    AVAX --> WRAP
+
+    WRAP --> WM
+    WM --> TRADE
+    TRADE --> UNWRAP
+    UNWRAP --> INTENT
+    INTENT --> IR
+
+    BC --> WM
+    CR --> WM
+    AP --> INTENT
+```
+
+### Components
+
+| Component | Language | Description |
+|-----------|----------|-------------|
+| `programs/portal-bridge` | Rust | Anchor on-chain program managing wrapper mints, intents, and settlements |
+| `sdk` | TypeScript | Client library for building and sending Portal transactions |
+| `cli` | TypeScript | Command-line interface for bridge operations |
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/prtldotfun/portal-labs.git
+cd portal-labs
+```
+
+### Build the On-Chain Program
+
+```bash
+anchor build
+```
+
+### Build the SDK
+
+```bash
+cd sdk
+npm install
+npm run build
+```
+
+### Build the CLI
+
+```bash
+cd cli
+npm install
+npm run build
+```
+
+---
+
+## Usage
+
