@@ -128,3 +128,73 @@ npm run build
 
 ## Usage
 
+### SDK
+
+```typescript
+import { PortalClient } from "@portal-labs/sdk";
+import { Keypair } from "@solana/web3.js";
+import BN from "bn.js";
+
+const client = new PortalClient({
+  rpcUrl: "https://api.mainnet-beta.solana.com",
+});
+
+// Register as an agent
+const agent = Keypair.generate();
+await client.registerAgent(agent, "my-trading-bot");
+
+// Check agent profile
+const profile = await client.getAgentProfile(agent.publicKey);
+console.log(`Agent: ${profile.alias}, Volume: ${profile.totalVolume}`);
+
+// Submit a cross-chain intent
+const intent = await client.submitIntent(agent, {
+  wrapperMint: pEthMint,
+  amount: new BN(1_000_000_000),
+  destinationChainId: 1,
+  destinationAddress: encodeAddress("0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18"),
+});
+
+console.log(`Intent #${intent.intentId} submitted. Signature: ${intent.signature}`);
+```
+
+### CLI
+
+```bash
+# Register as an agent
+portal register --alias "my-agent"
+
+# Wrap tokens (relayer operation)
+portal wrap \
+  --mint <WRAPPER_MINT> \
+  --agent <AGENT_PUBKEY> \
+  --amount 1000000000 \
+  --source-tx <SOURCE_TX_HASH>
+
+# Submit a bridge intent
+portal bridge \
+  --mint <WRAPPER_MINT> \
+  --amount 1000000000 \
+  --dest-chain 1 \
+  --dest-address 0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18
+
+# Check intent status
+portal status intent 0
+
+# View bridge statistics
+portal status bridge
+
+# View agent profile
+portal status agent
+```
+
+---
+
+## On-Chain Program
+
+### Instructions
+
+| Instruction | Access | Description |
+|-------------|--------|-------------|
+| `initialize` | Authority | Initialize bridge config and chain registry |
+| `register_chain` | Authority | Register a new destination chain |
