@@ -198,3 +198,53 @@ portal status agent
 |-------------|--------|-------------|
 | `initialize` | Authority | Initialize bridge config and chain registry |
 | `register_chain` | Authority | Register a new destination chain |
+| `create_wrapper` | Authority | Create a wrapper token mint for a cross-chain asset |
+| `wrap_tokens` | Relayer | Mint wrapper tokens when assets arrive from source chain |
+| `unwrap_tokens` | Agent | Burn wrapper tokens and initiate cross-chain redemption |
+| `submit_intent` | Agent | Lock wrapper tokens into a cross-chain settlement intent |
+| `settle_intent` | Relayer | Mark an intent as settled with destination chain tx proof |
+| `cancel_intent` | Agent | Cancel an expired intent and reclaim wrapper tokens |
+| `register_agent` | Agent | Create an on-chain agent profile |
+| `update_agent` | Agent | Update agent alias |
+| `update_bridge_config` | Authority | Modify fee, pause state, treasury, or relayer |
+
+### Account Structure
+
+```mermaid
+classDiagram
+    class BridgeConfig {
+        +Pubkey authority
+        +u16 fee_bps
+        +u64 total_wrapped
+        +u64 total_unwrapped
+        +u64 total_intents
+        +bool paused
+        +Pubkey treasury
+        +Pubkey relayer
+    }
+
+    class ChainRegistry {
+        +Vec~ChainEntry~ chains
+        +u16 chain_count
+    }
+
+    class WrapperMeta {
+        +Pubkey mint
+        +u16 source_chain_id
+        +[u8; 32] source_token_address
+        +String symbol
+        +u8 decimals
+        +u64 total_supply
+    }
+
+    class IntentRecord {
+        +u64 intent_id
+        +Pubkey agent
+        +u16 destination_chain_id
+        +u64 amount
+        +IntentStatus status
+        +u64 expiry_slot
+    }
+
+    class AgentProfile {
+        +Pubkey owner
