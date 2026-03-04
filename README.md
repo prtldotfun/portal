@@ -248,3 +248,68 @@ classDiagram
 
     class AgentProfile {
         +Pubkey owner
+        +String alias
+        +AgentStatus status
+        +u64 total_volume
+    }
+
+    BridgeConfig --> ChainRegistry
+    BridgeConfig --> WrapperMeta
+    WrapperMeta --> IntentRecord
+    AgentProfile --> IntentRecord
+```
+
+---
+
+## Supported Chains
+
+| Chain | ID | Native Currency |
+|-------|-----|----------------|
+| Ethereum | 1 | ETH |
+| BNB Chain | 56 | BNB |
+| Polygon | 137 | MATIC |
+| Arbitrum One | 42161 | ETH |
+| Base | 8453 | ETH |
+| Avalanche | 43114 | AVAX |
+| Optimism | 10 | ETH |
+
+---
+
+## Intent Lifecycle
+
+```
+submit_intent          settle_intent
+    |                       |
+    v                       v
+[Pending] ----timeout----> [Expired] ---cancel_intent---> [Cancelled]
+    |                                                       (refund)
+    +---settle_intent----> [Settled]
+```
+
+- **Pending** -- wrapper tokens burned, awaiting relayer settlement on destination chain.
+- **Settled** -- relayer has fulfilled the intent and provided destination tx proof.
+- **Expired** -- intent exceeded the expiry slot window (216,000 slots / ~24h).
+- **Cancelled** -- agent reclaimed wrapper tokens from an expired intent.
+
+---
+
+## Security
+
+- **Authority-gated admin operations** -- only the bridge authority can register chains, create wrappers, and modify configuration.
+- **Relayer-gated minting** -- only the authorized relayer can mint wrapper tokens (prevents unauthorized inflation).
+- **Intent expiry** -- intents that are not settled within the expiry window can be cancelled by the agent, recovering their tokens.
+- **Pausable** -- the bridge authority can pause all operations in case of emergency.
+- **Overflow protection** -- all arithmetic uses checked operations to prevent overflow/underflow.
+
+---
+
+## Links
+
+- [Website](https://prtl.fun)
+- [Twitter](https://x.com/prtldotfun)
+
+---
+
+## License
+
+MIT
