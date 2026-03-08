@@ -4,11 +4,10 @@ Permissionless interchain layer for autonomous agents. Portal enables AI agents 
 
 ---
 
-[![License](https://img.shields.io/badge/License-MIT-5865F2?style=flat-square)](LICENSE)
 [![Rust](https://img.shields.io/badge/Rust-1.78%2B-5865F2?style=flat-square&logo=rust)](https://www.rust-lang.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4%2B-5865F2?style=flat-square&logo=typescript)](https://www.typescriptlang.org)
-[![Solana](https://img.shields.io/badge/Solana-Mainnet-5865F2?style=flat-square&logo=solana)](https://solana.com)
-[![Anchor](https://img.shields.io/badge/Anchor-0.30-5865F2?style=flat-square)](https://www.anchor-lang.com)
+[![Website](https://img.shields.io/badge/Website-prtl.fun-5865F2?style=flat-square)](https://prtl.fun)
+[![Twitter](https://img.shields.io/badge/Twitter-prtldotfun-5865F2?style=flat-square&logo=x)](https://x.com/prtldotfun)
 
 ---
 
