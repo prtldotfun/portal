@@ -12,7 +12,7 @@ import {
 } from "@solana/spl-token";
 import BN from "bn.js";
 
-import { PORTAL_PROGRAM_ID } from "./constants";
+import { PORTAL_PROGRAM_ID, BASIS_POINTS_DIVISOR } from "./constants";
 import { PortalInstructions } from "./instructions";
 import {
     deriveBridgeConfigPda,
@@ -41,7 +41,13 @@ import type {
     SubmitIntentConfig,
     SettleIntentConfig,
 } from "./types";
-import { deserializeBridgeConfig } from "./utils/serialize";
+import {
+    deserializeBridgeConfig,
+    deserializeAgentProfile,
+    deserializeWrapperMeta,
+    deserializeIntentRecord,
+    deserializeChainRegistry,
+} from "./utils/serialize";
 
 export class PortalClient {
     readonly connection: Connection;
@@ -58,98 +64,35 @@ export class PortalClient {
         const [pda] = deriveBridgeConfigPda(this.programId);
         const accountInfo = await this.connection.getAccountInfo(pda);
         if (!accountInfo) return null;
-
-        const decoded = deserializeBridgeConfig(accountInfo.data as Buffer);
-        return {
-            ...decoded,
-            createdAt: new BN(0),
-            updatedAt: new BN(0),
-            treasury: PublicKey.default,
-            relayer: PublicKey.default,
-            bump: 0,
-        };
+        return deserializeBridgeConfig(accountInfo.data as Buffer);
     }
 
     async getChainRegistry(): Promise<ChainRegistry | null> {
         const [pda] = deriveChainRegistryPda(this.programId);
         const accountInfo = await this.connection.getAccountInfo(pda);
         if (!accountInfo) return null;
-
-        return {
-            authority: PublicKey.default,
-            chainCount: 0,
-            chains: [],
-            bump: 0,
-        };
+        return deserializeChainRegistry(accountInfo.data as Buffer);
     }
 
     async getWrapperMeta(wrapperMint: PublicKey): Promise<WrapperMeta | null> {
         const [pda] = deriveWrapperMetaPda(wrapperMint, this.programId);
         const accountInfo = await this.connection.getAccountInfo(pda);
         if (!accountInfo) return null;
-
-        return {
-            mint: wrapperMint,
-            sourceChainId: 0,
-            sourceTokenAddress: new Uint8Array(32),
-            symbol: "",
-            name: "",
-            decimals: 0,
-            sourceDecimals: 0,
-            totalSupply: new BN(0),
-            totalMinted: new BN(0),
-            totalBurned: new BN(0),
-            active: true,
-            createdAt: new BN(0),
-            updatedAt: new BN(0),
-            metadataUri: "",
-            bump: 0,
-            mintBump: 0,
-        };
+        return deserializeWrapperMeta(accountInfo.data as Buffer);
     }
 
     async getAgentProfile(owner: PublicKey): Promise<AgentProfile | null> {
         const [pda] = deriveAgentPda(owner, this.programId);
         const accountInfo = await this.connection.getAccountInfo(pda);
         if (!accountInfo) return null;
-
-        return {
-            owner,
-            alias: "",
-            status: "active",
-            totalWraps: new BN(0),
-            totalUnwraps: new BN(0),
-            totalIntents: new BN(0),
-            totalVolume: new BN(0),
-            registeredAt: new BN(0),
-            lastActivity: new BN(0),
-            bump: 0,
-        };
+        return deserializeAgentProfile(accountInfo.data as Buffer);
     }
 
     async getIntentRecord(intentId: BN): Promise<IntentRecord | null> {
         const [pda] = deriveIntentPda(intentId, this.programId);
         const accountInfo = await this.connection.getAccountInfo(pda);
         if (!accountInfo) return null;
-
-        return {
-            intentId,
-            agent: PublicKey.default,
-            sourceChainId: 0,
-            destinationChainId: 0,
-            wrapperMint: PublicKey.default,
-            amount: new BN(0),
-            feeAmount: new BN(0),
-            netAmount: new BN(0),
-            destinationAddress: new Uint8Array(32),
-            status: "pending",
-            createdAt: new BN(0),
-            settledAt: new BN(0),
-            settlementTxHash: new Uint8Array(32),
-            relayer: PublicKey.default,
-            expirySlot: new BN(0),
-            bump: 0,
-        };
+        return deserializeIntentRecord(accountInfo.data as Buffer);
     }
 
     async initialize(
@@ -230,6 +173,10 @@ export class PortalClient {
         agent: Keypair,
         config: UnwrapConfig
     ): Promise<UnwrapResult> {
+        const bridgeConfig = await this.getBridgeConfig();
+        const feeBps = bridgeConfig?.feeBps ?? 0;
+        const feeAmount = config.amount.mul(new BN(feeBps)).div(new BN(BASIS_POINTS_DIVISOR));
+
         const ix = this.instructions.unwrapTokens(agent.publicKey, config);
         const tx = new Transaction().add(ix);
 
@@ -241,7 +188,7 @@ export class PortalClient {
             signature,
             wrapperMint: config.wrapperMint,
             amount: config.amount,
-            feeAmount: new BN(0),
+            feeAmount,
             destinationChainId: config.destinationChainId,
             destinationAddress: config.destinationAddress,
         };
@@ -253,6 +200,9 @@ export class PortalClient {
     ): Promise<IntentResult> {
         const bridgeConfig = await this.getBridgeConfig();
         const intentId = bridgeConfig?.totalIntents ?? new BN(0);
+        const feeBps = bridgeConfig?.feeBps ?? 0;
+        const feeAmount = config.amount.mul(new BN(feeBps)).div(new BN(BASIS_POINTS_DIVISOR));
+        const netAmount = config.amount.sub(feeAmount);
 
         const ix = this.instructions.submitIntent(
             agent.publicKey,
@@ -270,8 +220,8 @@ export class PortalClient {
             intentId,
             wrapperMint: config.wrapperMint,
             amount: config.amount,
-            netAmount: config.amount,
-            feeAmount: new BN(0),
+            netAmount,
+            feeAmount,
             destinationChainId: config.destinationChainId,
             destinationAddress: config.destinationAddress,
             expirySlot: new BN(0),
@@ -314,26 +264,43 @@ export class PortalClient {
         wrapperMint: PublicKey
     ): Promise<BN> {
         const ata = await getAssociatedTokenAddress(wrapperMint, agentOwner);
-        const accountInfo = await this.connection.getAccountInfo(ata);
-        if (!accountInfo) return new BN(0);
+        try {
+            const balance = await this.connection.getTokenAccountBalance(ata);
+            return new BN(balance.value.amount);
+        } catch {
+            return new BN(0);
+        }
+    }
 
-        const balance = await this.connection.getTokenAccountBalance(ata);
-        return new BN(balance.value.amount);
+    async cancelIntent(
+        agent: Keypair,
+        intentId: BN,
+        wrapperMint: PublicKey
+    ): Promise<string> {
+        const ix = this.instructions.cancelIntent(
+            agent.publicKey,
+            intentId,
+            wrapperMint
+        );
+        const tx = new Transaction().add(ix);
+        return sendAndConfirmTransaction(this.connection, tx, [agent]);
     }
 
     async getActiveIntents(agent: PublicKey): Promise<IntentRecord[]> {
-        const intents: IntentRecord[] = [];
-        const config = await this.getBridgeConfig();
-        if (!config) return intents;
+        const accounts = await this.connection.getProgramAccounts(this.programId, {
+            filters: [
+                { dataSize: 8 + 210 },
+                { memcmp: { offset: 16, bytes: agent.toBase58() } },
+            ],
+        });
 
-        const totalIntents = config.totalIntents.toNumber();
-        for (let i = 0; i < totalIntents; i++) {
-            const intent = await this.getIntentRecord(new BN(i));
-            if (intent && intent.agent.equals(agent) && intent.status === "pending") {
+        const intents: IntentRecord[] = [];
+        for (const { account } of accounts) {
+            const intent = deserializeIntentRecord(account.data as Buffer);
+            if (intent.status === "pending") {
                 intents.push(intent);
             }
         }
-
         return intents;
     }
 }

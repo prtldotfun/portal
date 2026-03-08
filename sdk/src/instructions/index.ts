@@ -9,13 +9,7 @@ import BN from "bn.js";
 
 import {
     PORTAL_PROGRAM_ID,
-    BRIDGE_CONFIG_SEED,
-    CHAIN_REGISTRY_SEED,
-    WRAPPER_MINT_SEED,
-    WRAPPER_META_SEED,
-    INTENT_SEED,
-    AGENT_SEED,
-} from "./constants";
+} from "../constants";
 import {
     deriveBridgeConfigPda,
     deriveChainRegistryPda,
@@ -23,7 +17,7 @@ import {
     deriveWrapperMetaPda,
     deriveIntentPda,
     deriveAgentPda,
-} from "./utils/pda";
+} from "../utils/pda";
 import {
     serializeInitializeParams,
     serializeRegisterChainParams,
@@ -32,7 +26,7 @@ import {
     serializeSubmitIntentParams,
     serializeSettleIntentParams,
     serializeRegisterAgentParams,
-} from "./utils/serialize";
+} from "../utils/serialize";
 import type {
     InitializeConfig,
     RegisterChainConfig,
@@ -41,13 +35,20 @@ import type {
     UnwrapConfig,
     SubmitIntentConfig,
     SettleIntentConfig,
-} from "./types";
+} from "../types";
+
+const crypto = require("crypto");
+const discriminatorCache = new Map<string, Buffer>();
 
 function encodeInstructionDiscriminator(name: string): Buffer {
-    const crypto = require("crypto");
+    const cached = discriminatorCache.get(name);
+    if (cached) return cached;
+
     const hash = crypto.createHash("sha256");
     hash.update(`global:${name}`);
-    return Buffer.from(hash.digest().subarray(0, 8));
+    const disc = Buffer.from(hash.digest().subarray(0, 8));
+    discriminatorCache.set(name, disc);
+    return disc;
 }
 
 export class PortalInstructions {
@@ -358,6 +359,37 @@ export class PortalInstructions {
             keys: [
                 { pubkey: owner, isSigner: true, isWritable: true },
                 { pubkey: agentProfile, isSigner: false, isWritable: true },
+            ],
+            programId: this.programId,
+            data,
+        });
+    }
+
+    cancelIntent(
+        agent: PublicKey,
+        intentId: BN,
+        wrapperMint: PublicKey
+    ): TransactionInstruction {
+        const [bridgeConfig] = deriveBridgeConfigPda(this.programId);
+        const [intentRecord] = deriveIntentPda(intentId, this.programId);
+        const [wrapperMeta] = deriveWrapperMetaPda(wrapperMint, this.programId);
+        const [agentProfile] = deriveAgentPda(agent, this.programId);
+
+        const data = Buffer.concat([
+            encodeInstructionDiscriminator("cancel_intent"),
+            intentId.toArrayLike(Buffer, "le", 8),
+        ]);
+
+        return new TransactionInstruction({
+            keys: [
+                { pubkey: agent, isSigner: true, isWritable: true },
+                { pubkey: bridgeConfig, isSigner: false, isWritable: true },
+                { pubkey: intentRecord, isSigner: false, isWritable: true },
+                { pubkey: wrapperMint, isSigner: false, isWritable: true },
+                { pubkey: wrapperMeta, isSigner: false, isWritable: true },
+                { pubkey: agentProfile, isSigner: false, isWritable: true },
+                { pubkey: PublicKey.default, isSigner: false, isWritable: true },
+                { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
             ],
             programId: this.programId,
             data,

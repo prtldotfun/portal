@@ -124,6 +124,11 @@ export function deserializeBridgeConfig(data: Buffer): {
     registeredWrappers: number;
     registeredAgents: number;
     paused: boolean;
+    createdAt: BN;
+    updatedAt: BN;
+    treasury: PublicKey;
+    relayer: PublicKey;
+    bump: number;
 } {
     let offset = 8;
     const authority = new PublicKey(data.subarray(offset, offset + 32));
@@ -145,6 +150,16 @@ export function deserializeBridgeConfig(data: Buffer): {
     const registeredAgents = data.readUInt32LE(offset);
     offset += 4;
     const paused = data[offset] === 1;
+    offset += 1;
+    const createdAt = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const updatedAt = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const treasury = new PublicKey(data.subarray(offset, offset + 32));
+    offset += 32;
+    const relayer = new PublicKey(data.subarray(offset, offset + 32));
+    offset += 32;
+    const bump = data[offset];
 
     return {
         authority,
@@ -157,5 +172,224 @@ export function deserializeBridgeConfig(data: Buffer): {
         registeredWrappers,
         registeredAgents,
         paused,
+        createdAt,
+        updatedAt,
+        treasury,
+        relayer,
+        bump,
     };
 }
+
+function readString(data: Buffer, offset: number): [string, number] {
+    const len = data.readUInt32LE(offset);
+    offset += 4;
+    const str = data.subarray(offset, offset + len).toString("utf-8");
+    return [str, offset + len];
+}
+
+export function deserializeChainRegistry(data: Buffer): {
+    authority: PublicKey;
+    chainCount: number;
+    chains: Array<{
+        chainId: number;
+        name: string;
+        active: boolean;
+        confirmationsRequired: number;
+        bridgeContract: Uint8Array;
+        registeredAt: BN;
+        totalVolume: BN;
+    }>;
+    bump: number;
+} {
+    let offset = 8;
+    const authority = new PublicKey(data.subarray(offset, offset + 32));
+    offset += 32;
+    const chainCount = data.readUInt16LE(offset);
+    offset += 2;
+
+    const vecLen = data.readUInt32LE(offset);
+    offset += 4;
+
+    const chains = [];
+    for (let i = 0; i < vecLen; i++) {
+        const chainId = data.readUInt16LE(offset);
+        offset += 2;
+        const [name, newOffset] = readString(data, offset);
+        offset = newOffset;
+        const active = data[offset] === 1;
+        offset += 1;
+        const confirmationsRequired = data.readUInt16LE(offset);
+        offset += 2;
+        const bridgeContract = new Uint8Array(data.subarray(offset, offset + 32));
+        offset += 32;
+        const registeredAt = new BN(data.subarray(offset, offset + 8), "le");
+        offset += 8;
+        const totalVolume = new BN(data.subarray(offset, offset + 8), "le");
+        offset += 8;
+
+        chains.push({ chainId, name, active, confirmationsRequired, bridgeContract, registeredAt, totalVolume });
+    }
+
+    const bump = data[offset] ?? 0;
+
+    return { authority, chainCount, chains, bump };
+}
+
+export function deserializeWrapperMeta(data: Buffer): {
+    mint: PublicKey;
+    sourceChainId: number;
+    sourceTokenAddress: Uint8Array;
+    symbol: string;
+    name: string;
+    decimals: number;
+    sourceDecimals: number;
+    totalSupply: BN;
+    totalMinted: BN;
+    totalBurned: BN;
+    active: boolean;
+    createdAt: BN;
+    updatedAt: BN;
+    metadataUri: string;
+    bump: number;
+    mintBump: number;
+} {
+    let offset = 8;
+    const mint = new PublicKey(data.subarray(offset, offset + 32));
+    offset += 32;
+    const sourceChainId = data.readUInt16LE(offset);
+    offset += 2;
+    const sourceTokenAddress = new Uint8Array(data.subarray(offset, offset + 32));
+    offset += 32;
+    const [symbol, off1] = readString(data, offset);
+    offset = off1;
+    const [name, off2] = readString(data, offset);
+    offset = off2;
+    const decimals = data[offset];
+    offset += 1;
+    const sourceDecimals = data[offset];
+    offset += 1;
+    const totalSupply = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const totalMinted = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const totalBurned = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const active = data[offset] === 1;
+    offset += 1;
+    const createdAt = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const updatedAt = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const [metadataUri, off3] = readString(data, offset);
+    offset = off3;
+    const bump = data[offset];
+    offset += 1;
+    const mintBump = data[offset];
+
+    return { mint, sourceChainId, sourceTokenAddress, symbol, name, decimals, sourceDecimals, totalSupply, totalMinted, totalBurned, active, createdAt, updatedAt, metadataUri, bump, mintBump };
+}
+
+function decodeIntentStatus(value: number): "pending" | "settled" | "cancelled" | "expired" {
+    switch (value) {
+        case 0: return "pending";
+        case 1: return "settled";
+        case 2: return "cancelled";
+        case 3: return "expired";
+        default: return "pending";
+    }
+}
+
+export function deserializeIntentRecord(data: Buffer): {
+    intentId: BN;
+    agent: PublicKey;
+    sourceChainId: number;
+    destinationChainId: number;
+    wrapperMint: PublicKey;
+    amount: BN;
+    feeAmount: BN;
+    netAmount: BN;
+    destinationAddress: Uint8Array;
+    status: "pending" | "settled" | "cancelled" | "expired";
+    createdAt: BN;
+    settledAt: BN;
+    settlementTxHash: Uint8Array;
+    relayer: PublicKey;
+    expirySlot: BN;
+    bump: number;
+} {
+    let offset = 8;
+    const intentId = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const agent = new PublicKey(data.subarray(offset, offset + 32));
+    offset += 32;
+    const sourceChainId = data.readUInt16LE(offset);
+    offset += 2;
+    const destinationChainId = data.readUInt16LE(offset);
+    offset += 2;
+    const wrapperMint = new PublicKey(data.subarray(offset, offset + 32));
+    offset += 32;
+    const amount = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const feeAmount = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const netAmount = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const destinationAddress = new Uint8Array(data.subarray(offset, offset + 32));
+    offset += 32;
+    const status = decodeIntentStatus(data[offset]);
+    offset += 1;
+    const createdAt = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const settledAt = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const settlementTxHash = new Uint8Array(data.subarray(offset, offset + 32));
+    offset += 32;
+    const relayer = new PublicKey(data.subarray(offset, offset + 32));
+    offset += 32;
+    const expirySlot = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const bump = data[offset];
+
+    return { intentId, agent, sourceChainId, destinationChainId, wrapperMint, amount, feeAmount, netAmount, destinationAddress, status, createdAt, settledAt, settlementTxHash, relayer, expirySlot, bump };
+}
+
+function decodeAgentStatus(value: number): "active" | "suspended" {
+    return value === 0 ? "active" : "suspended";
+}
+
+export function deserializeAgentProfile(data: Buffer): {
+    owner: PublicKey;
+    alias: string;
+    status: "active" | "suspended";
+    totalWraps: BN;
+    totalUnwraps: BN;
+    totalIntents: BN;
+    totalVolume: BN;
+    registeredAt: BN;
+    lastActivity: BN;
+    bump: number;
+} {
+    let offset = 8;
+    const owner = new PublicKey(data.subarray(offset, offset + 32));
+    offset += 32;
+    const [alias, newOffset] = readString(data, offset);
+    offset = newOffset;
+    const status = decodeAgentStatus(data[offset]);
+    offset += 1;
+    const totalWraps = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const totalUnwraps = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const totalIntents = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const totalVolume = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const registeredAt = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const lastActivity = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
+    const bump = data[offset];
+
+    return { owner, alias, status, totalWraps, totalUnwraps, totalIntents, totalVolume, registeredAt, lastActivity, bump };
+}
+
