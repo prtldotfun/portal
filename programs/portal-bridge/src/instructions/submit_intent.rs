@@ -130,7 +130,7 @@ pub fn handler(ctx: Context<SubmitIntent>, params: SubmitIntentParams) -> Result
     token::burn(burn_ctx, params.amount)?;
 
     let clock = Clock::get()?;
-    let slot = Clock::get()?.slot;
+    let slot = clock.slot;
 
     let config = &mut ctx.accounts.bridge_config;
     let intent_id = config.increment_intents()?;
@@ -153,6 +153,7 @@ pub fn handler(ctx: Context<SubmitIntent>, params: SubmitIntentParams) -> Result
     intent.status = IntentStatus::Pending;
     intent.created_at = clock.unix_timestamp;
     intent.settled_at = 0;
+    intent.cancelled_at = 0;
     intent.settlement_tx_hash = [0u8; 32];
     intent.relayer = Pubkey::default();
     intent.expiry_slot = slot

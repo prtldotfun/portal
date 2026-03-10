@@ -312,6 +312,7 @@ export function deserializeIntentRecord(data: Buffer): {
     status: "pending" | "settled" | "cancelled" | "expired";
     createdAt: BN;
     settledAt: BN;
+    cancelledAt: BN;
     settlementTxHash: Uint8Array;
     relayer: PublicKey;
     expirySlot: BN;
@@ -342,6 +343,8 @@ export function deserializeIntentRecord(data: Buffer): {
     offset += 8;
     const settledAt = new BN(data.subarray(offset, offset + 8), "le");
     offset += 8;
+    const cancelledAt = new BN(data.subarray(offset, offset + 8), "le");
+    offset += 8;
     const settlementTxHash = new Uint8Array(data.subarray(offset, offset + 32));
     offset += 32;
     const relayer = new PublicKey(data.subarray(offset, offset + 32));
@@ -350,7 +353,7 @@ export function deserializeIntentRecord(data: Buffer): {
     offset += 8;
     const bump = data[offset];
 
-    return { intentId, agent, sourceChainId, destinationChainId, wrapperMint, amount, feeAmount, netAmount, destinationAddress, status, createdAt, settledAt, settlementTxHash, relayer, expirySlot, bump };
+    return { intentId, agent, sourceChainId, destinationChainId, wrapperMint, amount, feeAmount, netAmount, destinationAddress, status, createdAt, settledAt, cancelledAt, settlementTxHash, relayer, expirySlot, bump };
 }
 
 function decodeAgentStatus(value: number): "active" | "suspended" {

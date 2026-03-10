@@ -41,7 +41,7 @@ pub fn handler(ctx: Context<SettleIntent>, params: SettleIntentParams) -> Result
     );
 
     let clock = Clock::get()?;
-    let slot = Clock::get()?.slot;
+    let slot = clock.slot;
 
     let intent = &mut ctx.accounts.intent_record;
     require!(intent.can_settle(slot), PortalError::IntentExpired);

@@ -59,11 +59,11 @@ pub struct CancelIntent<'info> {
 }
 
 pub fn handler(ctx: Context<CancelIntent>) -> Result<()> {
-    let slot = Clock::get()?.slot;
     let clock = Clock::get()?;
+    let slot = clock.slot;
 
     let intent = &mut ctx.accounts.intent_record;
-    intent.cancel(slot)?;
+    intent.cancel(slot, clock.unix_timestamp)?;
 
     let refund = intent.refund_amount();
 

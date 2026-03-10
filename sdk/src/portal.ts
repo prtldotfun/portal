@@ -289,7 +289,7 @@ export class PortalClient {
     async getActiveIntents(agent: PublicKey): Promise<IntentRecord[]> {
         const accounts = await this.connection.getProgramAccounts(this.programId, {
             filters: [
-                { dataSize: 8 + 210 },
+                { dataSize: 8 + 218 },
                 { memcmp: { offset: 16, bytes: agent.toBase58() } },
             ],
         });

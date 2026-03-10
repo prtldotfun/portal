@@ -23,6 +23,7 @@ pub struct IntentRecord {
     pub status: IntentStatus,
     pub created_at: i64,
     pub settled_at: i64,
+    pub cancelled_at: i64,
     pub settlement_tx_hash: [u8; 32],
     pub relayer: Pubkey,
     pub expiry_slot: u64,
@@ -60,13 +61,14 @@ impl IntentRecord {
         Ok(())
     }
 
-    pub fn cancel(&mut self, current_slot: u64) -> Result<()> {
+    pub fn cancel(&mut self, current_slot: u64, timestamp: i64) -> Result<()> {
         require!(self.is_pending(), crate::error::PortalError::IntentAlreadyCancelled);
         require!(
             self.is_expired(current_slot),
             crate::error::PortalError::IntentStillPending
         );
         self.status = IntentStatus::Cancelled;
+        self.cancelled_at = timestamp;
         Ok(())
     }
 

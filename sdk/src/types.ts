@@ -76,6 +76,7 @@ export interface IntentRecord {
     status: IntentStatus;
     createdAt: BN;
     settledAt: BN;
+    cancelledAt: BN;
     settlementTxHash: Uint8Array;
     relayer: PublicKey;
     expirySlot: BN;
